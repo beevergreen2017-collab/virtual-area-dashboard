@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { formatNumber } from './lib/format.js';
+import { EPSILON, clamp, parseNumber, toPing, fromPing } from './lib/math.js';
 import {
   PieChart,
   Pie,
@@ -16,22 +18,6 @@ import {
 } from 'recharts';
 
 const COLORS = ['#1d4ed8', '#93c5fd'];
-const PING_RATE = 3.305785;
-const EPSILON = 0.001;
-
-const formatNumber = (value, digits = 2) =>
-  Number(value).toLocaleString('zh-Hant', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-const toPing = (value) => value / PING_RATE;
-const fromPing = (value) => value * PING_RATE;
-const parseNumber = (value, fallback) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
 
 export default function App() {
   const initial = useMemo(() => {
