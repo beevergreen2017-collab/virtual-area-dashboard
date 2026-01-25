@@ -9,6 +9,11 @@ import {
   buildSensitivityData,
 } from './domain/chartData.js';
 import {
+  computeDiff,
+  computeKNearLimit,
+  computeRatioWarning,
+} from './domain/derived.js';
+import {
   PieChart,
   Pie,
   Cell,
@@ -87,11 +92,7 @@ export default function App() {
     [r0, r1, t0, mode, unit, kMax, kStep, basis, P0]
   );
 
-  const diff = {
-    usable: parsed.usable1 - parsed.usable0,
-    virtual: parsed.virtual1 - parsed.virtual0,
-    total: parsed.total1 - parsed.total0,
-  };
+  const diff = useMemo(() => computeDiff(parsed), [parsed]);
 
   const handleCopyLink = async () => {
     const params = new URLSearchParams({
@@ -115,8 +116,11 @@ export default function App() {
     }
   };
 
-  const kNearLimit = sales.kCurrent >= 0.98 || parseNumber(kMax, 0) >= 0.98;
-  const ratioWarning = parsed.ratio0 >= 0.98 || parsed.ratio1 >= 0.98;
+  const kNearLimit = useMemo(
+    () => computeKNearLimit(sales.kCurrent, kMax),
+    [sales.kCurrent, kMax]
+  );
+  const ratioWarning = useMemo(() => computeRatioWarning(parsed), [parsed]);
 
   return (
     <div className="app">
