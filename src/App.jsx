@@ -1,18 +1,7 @@
 import { useMemo, useState } from 'react';
 import { formatNumber } from './lib/format.js';
 import { EPSILON, clamp, parseNumber, toPing, fromPing } from './lib/math.js';
-import { computeArea } from './domain/areaModel.js';
-import { computeSales } from './domain/salesModel.js';
-import {
-  buildBarData,
-  buildDonutData,
-  buildSensitivityData,
-} from './domain/chartData.js';
-import {
-  computeDiff,
-  computeKNearLimit,
-  computeRatioWarning,
-} from './domain/derived.js';
+import { buildDashboardState } from './domain/dashboardState.js';
 import {
   PieChart,
   Pie,
@@ -62,43 +51,33 @@ export default function App() {
   const displayArea = (value) => (unit === 'ping' ? toPing(value) : value);
   const inputAreaValue = displayArea(parseNumber(t0, 0));
 
-  const parsed = useMemo(
-    () => computeArea({ r0, r1, t0, mode }),
-    [r0, r1, t0, mode]
-  );
-
-  const sales = useMemo(
-    () => computeSales({ basis, parsed, P0 }),
-    [basis, parsed, P0]
-  );
-
-  const donutData = useMemo(() => buildDonutData(parsed, unit), [parsed, unit]);
-
-  const barData = useMemo(() => buildBarData(parsed, unit), [parsed, unit]);
-
-  const sensitivityData = useMemo(
+  const dashboard = useMemo(
     () =>
-      buildSensitivityData({
+      buildDashboardState({
         r0,
         r1,
         t0,
         mode,
         unit,
-        kMax,
-        kStep,
         basis,
         P0,
+        kMax,
+        kStep,
       }),
-    [r0, r1, t0, mode, unit, kMax, kStep, basis, P0]
+    [r0, r1, t0, mode, unit, basis, P0, kMax, kStep]
   );
 
-  const diff = useMemo(() => computeDiff(parsed), [parsed]);
+
+
+
+
+
 
   const handleCopyLink = async () => {
     const params = new URLSearchParams({
-      r0: parsed.ratio0.toFixed(4),
-      r1: parsed.ratio1.toFixed(4),
-      T0: parsed.total0.toFixed(2),
+      r0: dashboard.parsed.ratio0.toFixed(4),
+      r1: dashboard.parsed.ratio1.toFixed(4),
+      T0: dashboard.parsed.total0.toFixed(2),
       mode,
       unit,
       basis,
@@ -116,11 +95,6 @@ export default function App() {
     }
   };
 
-  const kNearLimit = useMemo(
-    () => computeKNearLimit(sales.kCurrent, kMax),
-    [sales.kCurrent, kMax]
-  );
-  const ratioWarning = useMemo(() => computeRatioWarning(parsed), [parsed]);
 
   return (
     <div className="app">
@@ -208,33 +182,33 @@ export default function App() {
           </button>
         </div>
         {copyStatus ? <p className="note">{copyStatus}</p> : null}
-        {ratioWarning ? <p className="note">提示：r 接近 1 會導致面積推算失真，已自動限制。</p> : null}
+        {dashboard.ratioWarning ? <p className="note">提示：r 接近 1 會導致面積推算失真，已自動限制。</p> : null}
         <div className="chart-grid">
           <div className="card">
             <h3>改革前圓環圖</h3>
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie
-                  data={donutData}
+                  data={dashboard.donutData}
                   innerRadius={60}
                   outerRadius={90}
                   paddingAngle={4}
                   dataKey="value"
                   nameKey="name"
                 >
-                  {donutData.map((entry, index) => (
+                  {dashboard.donutData.map((entry, index) => (
                     <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value) => `${formatNumber(value)} ${unitLabel}`} />
               </PieChart>
             </ResponsiveContainer>
-            <p className="note">改革前虛坪率：{formatNumber(parsed.ratio0 * 100, 1)}%</p>
+            <p className="note">改革前虛坪率：{formatNumber(dashboard.parsed.ratio0 * 100, 1)}%</p>
           </div>
           <div className="card">
             <h3>改革前後堆疊柱狀圖</h3>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={barData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <BarChart data={dashboard.barData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis tickFormatter={(value) => `${formatNumber(value, 0)} ${unitLabel}`} />
@@ -252,19 +226,19 @@ export default function App() {
         <div className="summary-grid">
           <div className="summary-item">
             <span>實坪變化</span>
-            <strong>{formatNumber(displayArea(diff.usable))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.diff.usable))} {unitLabel}</strong>
           </div>
           <div className="summary-item">
             <span>虛坪變化</span>
-            <strong>{formatNumber(displayArea(diff.virtual))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.diff.virtual))} {unitLabel}</strong>
           </div>
           <div className="summary-item">
             <span>總面積變化</span>
-            <strong>{formatNumber(displayArea(diff.total))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.diff.total))} {unitLabel}</strong>
           </div>
           <div className="summary-item">
             <span>改革後虛坪率</span>
-            <strong>{formatNumber(parsed.ratio1 * 100, 1)}%</strong>
+            <strong>{formatNumber(dashboard.parsed.ratio1 * 100, 1)}%</strong>
           </div>
         </div>
       </section>
@@ -324,12 +298,12 @@ export default function App() {
             銷售口徑：室內 A
           </button>
         </div>
-        {kNearLimit ? <p className="note">提示：k 接近 1 會導致單價趨近無限，已自動限制。</p> : null}
+        {dashboard.kNearLimit ? <p className="note">提示：k 接近 1 會導致單價趨近無限，已自動限制。</p> : null}
         <div className="chart-grid">
           <div className="card">
             <h3>單價上調敏感度曲線（P1 = P0 / (1 - k)）</h3>
             <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={sensitivityData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+              <LineChart data={dashboard.sensitivityData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="k" tickFormatter={(value) => `${value}`} />
                 <YAxis domain={[1, 'auto']} />
@@ -352,8 +326,8 @@ export default function App() {
                 <span>最高單價</span>
                 <strong>
                   {formatNumber(
-                    sensitivityData.length
-                      ? sensitivityData[sensitivityData.length - 1].P1
+                    dashboard.sensitivityData.length
+                      ? dashboard.sensitivityData[dashboard.sensitivityData.length - 1].P1
                       : 1,
                     3
                   )}
@@ -361,11 +335,11 @@ export default function App() {
               </div>
               <div className="summary-item">
                 <span>目前情境 k</span>
-                <strong>{formatNumber(sales.kCurrent * 100, 2)}%</strong>
+                <strong>{formatNumber(dashboard.sales.kCurrent * 100, 2)}%</strong>
               </div>
               <div className="summary-item">
                 <span>目前情境 P1</span>
-                <strong>{formatNumber(sales.P1, 2)}</strong>
+                <strong>{formatNumber(dashboard.sales.P1, 2)}</strong>
               </div>
             </div>
           </div>
@@ -384,15 +358,15 @@ export default function App() {
             </thead>
             <tbody>
               <tr>
-                <td>{formatNumber(sales.kCurrent, 3)}</td>
+                <td>{formatNumber(dashboard.sales.kCurrent, 3)}</td>
                 <td>
-                  {formatNumber(displayArea(sales.S0))} {unitLabel}
+                  {formatNumber(displayArea(dashboard.sales.S0))} {unitLabel}
                 </td>
                 <td>
-                  {formatNumber(displayArea(sales.S1))} {unitLabel}
+                  {formatNumber(displayArea(dashboard.sales.S1))} {unitLabel}
                 </td>
-                <td>{formatNumber(sales.P1, 2)}</td>
-                <td>{formatNumber(sales.delta * 100, 2)}%</td>
+                <td>{formatNumber(dashboard.sales.P1, 2)}</td>
+                <td>{formatNumber(dashboard.sales.delta * 100, 2)}%</td>
               </tr>
             </tbody>
           </table>
@@ -407,27 +381,27 @@ export default function App() {
         <div className="summary-grid">
           <div className="summary-item">
             <span>改革前實坪</span>
-            <strong>{formatNumber(displayArea(parsed.usable0))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.parsed.usable0))} {unitLabel}</strong>
           </div>
           <div className="summary-item">
             <span>改革後實坪</span>
-            <strong>{formatNumber(displayArea(parsed.usable1))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.parsed.usable1))} {unitLabel}</strong>
           </div>
           <div className="summary-item">
             <span>改革前虛坪</span>
-            <strong>{formatNumber(displayArea(parsed.virtual0))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.parsed.virtual0))} {unitLabel}</strong>
           </div>
           <div className="summary-item">
             <span>改革後虛坪</span>
-            <strong>{formatNumber(displayArea(parsed.virtual1))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.parsed.virtual1))} {unitLabel}</strong>
           </div>
           <div className="summary-item">
             <span>改革後總面積</span>
-            <strong>{formatNumber(displayArea(parsed.total1))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.parsed.total1))} {unitLabel}</strong>
           </div>
           <div className="summary-item">
             <span>改革前總面積</span>
-            <strong>{formatNumber(displayArea(parsed.total0))} {unitLabel}</strong>
+            <strong>{formatNumber(displayArea(dashboard.parsed.total0))} {unitLabel}</strong>
           </div>
         </div>
         <p className="note">
