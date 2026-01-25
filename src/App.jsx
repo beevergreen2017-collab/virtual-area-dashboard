@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { formatNumber } from './lib/format.js';
 import { EPSILON, clamp, parseNumber, toPing, fromPing } from './lib/math.js';
+import { computeArea } from './domain/areaModel.js';
+import { computeSales } from './domain/salesModel.js';
 import {
   PieChart,
   Pie,
@@ -50,54 +52,15 @@ export default function App() {
   const displayArea = (value) => (unit === 'ping' ? toPing(value) : value);
   const inputAreaValue = displayArea(parseNumber(t0, 0));
 
-  const parsed = useMemo(() => {
-    const ratio0 = clamp(parseNumber(r0, 0), EPSILON, 1 - EPSILON);
-    const ratio1 = clamp(parseNumber(r1, 0), EPSILON, 1 - EPSILON);
-    const total0 = Math.max(parseNumber(t0, 0), 0);
-    const usable0 = total0 * (1 - ratio0);
-    const virtual0 = total0 * ratio0;
+  const parsed = useMemo(
+    () => computeArea({ r0, r1, t0, mode }),
+    [r0, r1, t0, mode]
+  );
 
-    let total1 = total0;
-    let usable1 = usable0;
-
-    if (mode === 'A') {
-      usable1 = usable0;
-      total1 = usable1 / (1 - ratio1 || 1);
-    } else {
-      total1 = total0;
-      usable1 = total1 * (1 - ratio1);
-    }
-
-    const virtual1 = Math.max(total1 - usable1, 0);
-
-    return {
-      ratio0,
-      ratio1,
-      total0,
-      total1,
-      usable0,
-      usable1,
-      virtual0,
-      virtual1,
-    };
-  }, [r0, r1, t0, mode]);
-
-  const sales = useMemo(() => {
-    const S0 = basis === 'T' ? parsed.total0 : parsed.usable0;
-    const S1 = basis === 'T' ? parsed.total1 : parsed.usable1;
-    const rawK = S0 > 0 ? 1 - S1 / S0 : 0;
-    const kCurrent = clamp(rawK, 0, 1 - EPSILON);
-    const P1 = parseNumber(P0, 0) / (1 - kCurrent);
-    const delta = 1 / (1 - kCurrent) - 1;
-    return {
-      S0,
-      S1,
-      rawK,
-      kCurrent,
-      P1,
-      delta,
-    };
-  }, [basis, parsed, P0]);
+  const sales = useMemo(
+    () => computeSales({ basis, parsed, P0 }),
+    [basis, parsed, P0]
+  );
 
   const donutData = useMemo(
     () => [
