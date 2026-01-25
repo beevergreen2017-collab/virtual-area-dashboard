@@ -4,6 +4,11 @@ import { EPSILON, clamp, parseNumber, toPing, fromPing } from './lib/math.js';
 import { computeArea } from './domain/areaModel.js';
 import { computeSales } from './domain/salesModel.js';
 import {
+  buildBarData,
+  buildDonutData,
+  buildSensitivityData,
+} from './domain/chartData.js';
+import {
   PieChart,
   Pie,
   Cell,
@@ -62,43 +67,25 @@ export default function App() {
     [basis, parsed, P0]
   );
 
-  const donutData = useMemo(
-    () => [
-      { name: '改革前虛坪', value: displayArea(parsed.virtual0) },
-      { name: '改革前實坪', value: displayArea(parsed.usable0) },
-    ],
-    [parsed, unit]
-  );
+  const donutData = useMemo(() => buildDonutData(parsed, unit), [parsed, unit]);
 
-  const barData = useMemo(
-    () => [
-      {
-        name: '改革前',
-        虛坪: displayArea(parsed.virtual0),
-        實坪: displayArea(parsed.usable0),
-      },
-      {
-        name: '改革後',
-        虛坪: displayArea(parsed.virtual1),
-        實坪: displayArea(parsed.usable1),
-      },
-    ],
-    [parsed, unit]
-  );
+  const barData = useMemo(() => buildBarData(parsed, unit), [parsed, unit]);
 
-  const sensitivityData = useMemo(() => {
-    const max = clamp(parseNumber(kMax, 0), 0, 1 - EPSILON);
-    const step = clamp(parseNumber(kStep, 0.01), 0.01, 0.5);
-    const rows = [];
-    for (let k = 0; k <= max + 1e-9; k += step) {
-      const factor = parseNumber(P0, 0) / (1 - k || 1);
-      rows.push({
-        k: Number(k.toFixed(2)),
-        P1: Number(factor.toFixed(3)),
-      });
-    }
-    return rows;
-  }, [kMax, kStep, P0]);
+  const sensitivityData = useMemo(
+    () =>
+      buildSensitivityData({
+        r0,
+        r1,
+        t0,
+        mode,
+        unit,
+        kMax,
+        kStep,
+        basis,
+        P0,
+      }),
+    [r0, r1, t0, mode, unit, kMax, kStep, basis, P0]
+  );
 
   const diff = {
     usable: parsed.usable1 - parsed.usable0,
